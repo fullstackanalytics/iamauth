@@ -9,7 +9,7 @@ Includes the following:
 * a pluggable `UserStore` for IAM role-based authentication 
     * integration with GCP IAM users
 
-## Usage 
+## Install 
 
 Install Go lib with example app
 ```
@@ -17,8 +17,13 @@ go get github.com/fullstackanalytics/iamauth...
 cd $GOPATH/src/github.com/fullstackanalytics/iamauth && go install
 ```
 
-see example app in `app/`
+## Usage
+
+see example app in `app/`.
+fill out the iamauth.env file per the template `iamauth.env` and save it to the `app/` directory
+`go run example.go`
 
 
 ## Todo
 * README
+* Tests
