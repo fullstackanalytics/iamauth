@@ -3,56 +3,19 @@ package iamauth
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 
-	"github.com/gorilla/sessions"
-	dot "github.com/joho/godotenv"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-)
-
-var (
-	Domain, CallbackPath string
-
-	Store *sessions.CookieStore
-	conf  *oauth2.Config
 )
 
 const SessionToken = "google-iam-auth"
 
-func Load() {
-	var cfg map[string]string
-	cfg, err := dot.Read("iamauth.env")
-	if err != nil {
-		log.Fatal("unable to read iamauth.env")
-	}
-
-	key := cfg["key"]
-	secret := cfg["secret"]
-	Domain = cfg["domain"]
-	CallbackPath = cfg["path.callback"]
-
-	gob.Register(map[string]interface{}{})
-
-	Store = sessions.NewCookieStore([]byte(randomString(32)))
-	conf = &oauth2.Config{
-		RedirectURL:  fmt.Sprintf("%s/%s", Domain, CallbackPath),
-		ClientID:     key,
-		ClientSecret: secret,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.profile",
-			"https://www.googleapis.com/auth/userinfo.email",
-		},
-		Endpoint: google.Endpoint,
-	}
-}
-
-func Login() http.HandlerFunc {
+// creates handler for step 1 of Oauth flow.
+func Step1() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// create new state with each login and store in session.
@@ -70,60 +33,35 @@ func Login() http.HandlerFunc {
 	}
 }
 
-func Callback(nextPath string) http.HandlerFunc {
+// creates handler for step 2 of Oauth flow.
+// optionally set roles for IAM based authentication.
+func Step2(nextPath string, roles ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		state := r.FormValue("state")
-
-		session, err := Store.Get(r, SessionToken)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		ok := authorize(w, r)
+		if !ok {
 			return
 		}
 
-		if state != session.Values["state"] {
-			log.Printf("invalid oauth state, expected '%s', got '%s'\n", session.Values["state"], state)
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-			return
-		}
+		if UsingIAM() {
 
-		code := r.FormValue("code")
-		token, err := conf.Exchange(oauth2.NoContext, code)
-		if err != nil {
-			fmt.Printf("Code exchange failed with '%s'\n", err)
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-			return
-		}
+			email, err := Email(r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if _, ok := UserDb.Search(email, roles...); !ok {
+				http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+				return
+			}
+			session, err := Store.Get(r, SessionToken)
+			if err != nil {
+				log.Println("error fetching session:", err)
+				http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+				return
+			}
+			session.Values["authenticated"] = "true"
+			session.Save(r, w)
 
-		// Getting now the userInfo
-		client := conf.Client(oauth2.NoContext, token)
-		resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		log.Println("able to get data")
-
-		raw, err := ioutil.ReadAll(resp.Body)
-		defer resp.Body.Close()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var profile map[string]interface{}
-		if err = json.Unmarshal(raw, &profile); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		session.Values["id_token"] = token.Extra("id_token")
-		session.Values["access_token"] = token.AccessToken
-		session.Values["profile"] = profile
-		log.Println("the profile is", profile)
-		err = session.Save(r, w)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
 
 		// Redirect to logged in page
@@ -132,6 +70,18 @@ func Callback(nextPath string) http.HandlerFunc {
 }
 
 func UserName(r *http.Request) (string, error) {
+	return extract("given_name", r)
+}
+
+func Email(r *http.Request) (string, error) {
+	return extract("email", r)
+}
+
+func PicURL(r *http.Request) (string, error) {
+	return extract("picture", r)
+}
+
+func extract(key string, r *http.Request) (string, error) {
 	session, err := Store.Get(r, SessionToken)
 	if err != nil {
 		return "", err
@@ -144,11 +94,68 @@ func UserName(r *http.Request) (string, error) {
 	}
 
 	var name string
-	if name, ok = profile["given_name"].(string); !ok {
+	if name, ok = profile[key].(string); !ok {
 		return "", fmt.Errorf("failed to retrieve profile")
 	}
 
 	return name, nil
+}
+
+func authorize(w http.ResponseWriter, r *http.Request) (ok bool) {
+	state := r.FormValue("state")
+
+	session, err := Store.Get(r, SessionToken)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if state != session.Values["state"] {
+		log.Printf("invalid oauth state, expected '%s', got '%s'\n", session.Values["state"], state)
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+
+	code := r.FormValue("code")
+	token, err := conf.Exchange(oauth2.NoContext, code)
+	if err != nil {
+		fmt.Printf("Code exchange failed with '%s'\n", err)
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Getting now the userInfo
+	client := conf.Client(oauth2.NoContext, token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	raw, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var profile map[string]interface{}
+	if err = json.Unmarshal(raw, &profile); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session.Values["id_token"] = token.Extra("id_token")
+	session.Values["access_token"] = token.AccessToken
+	session.Values["profile"] = profile
+	err = session.Save(r, w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok = true
+	return
 }
 
 func randomString(length int) (str string) {

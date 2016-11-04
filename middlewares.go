@@ -15,9 +15,14 @@ func Protect(next http.HandlerFunc) http.HandlerFunc {
 
 		if _, ok := session.Values["profile"]; !ok {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
-		} else {
-			next(w, r)
+			return
 		}
 
+		if _, ok := session.Values["authenticated"]; !ok && UsingIAM() {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+
+		next(w, r)
 	}
 }
