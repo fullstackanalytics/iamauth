@@ -1,6 +1,6 @@
 # iamauth
 
-`iamauth` provides Golang tools for implementing the server-side Oauth 2.0 _authorization_ flow for (Google Apps)[https://developers.google.com/identity/protocols/OAuth2WebServer]. For use with the Go Gorilla web toolkit.
+`iamauth` provides Golang tools for implementing the server-side Oauth 2.0 _authorization_ flow for [Google Apps](https://developers.google.com/identity/protocols/OAuth2WebServer). For use with the Go Gorilla web toolkit.
 It also includes tools for _authentication_ via IAM role-based access control.
 
 Includes the following:
