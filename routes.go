@@ -39,17 +39,27 @@ func Step2(nextPath string, roles ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok := authorize(w, r)
 		if !ok {
+			log.Println("error: unable to authorize")
 			return
 		}
 
 		if UsingIAM() {
+			n, err := UserDb.Reindex()
+			log.Printf("reindexed %d users", n)
+			if err != nil {
+				log.Println("unable to reindex IAM users ", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
 			email, err := Email(r)
 			if err != nil {
+				log.Println("unable to fetch email: ", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			if _, ok := UserDb.Search(email, roles...); !ok {
+				log.Println("unable to search IAM users. email: ", email)
 				http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 				return
 			}

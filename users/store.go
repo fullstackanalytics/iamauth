@@ -70,7 +70,6 @@ func New(name, proj string) (*UserStore, error) {
 // fetches latest IAM users and returns number of updates records
 func (store *UserStore) Reindex() (n int, err error) {
 	records, err := store.GetIamUsers()
-	log.Println("records", records)
 	if err != nil {
 		return
 	}
@@ -87,6 +86,7 @@ func (store *UserStore) Reindex() (n int, err error) {
 		}
 	}
 
+	log.Println("the store:", store.m)
 	return
 }
 
