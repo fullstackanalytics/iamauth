@@ -86,7 +86,6 @@ func (store *UserStore) Reindex() (n int, err error) {
 		}
 	}
 
-	log.Println("the store:", store.m)
 	return
 }
 

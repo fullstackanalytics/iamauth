@@ -44,8 +44,7 @@ func Step2(nextPath string, roles ...string) http.HandlerFunc {
 		}
 
 		if UsingIAM() {
-			n, err := UserDb.Reindex()
-			log.Printf("reindexed %d users", n)
+			_, err := UserDb.Reindex()
 			if err != nil {
 				log.Println("unable to reindex IAM users ", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
