@@ -4,7 +4,7 @@
 It also includes tools for _authentication_ via IAM role-based access control.
 
 Includes the following:
-* config-driven handlers for the two-step flow 
+* environment variable driven handlers for the two-step flow 
 * a cookie store for accessing Google user profile information
 * a pluggable `UserStore` for IAM role-based authentication 
     * integration with GCP IAM users
@@ -19,8 +19,19 @@ cd $GOPATH/src/github.com/fullstackanalytics/iamauth && go install
 
 ## Usage
 
+set the following variables:
+```
+#!/bin/bash
+
+export GOOGLE_APP_KEY=<YOUR_GOOGLE_OAUTH_KEY>
+export GOOGLE_APP_SECRET=<YOUR_GOOGLE_OATH_SECRET>
+export IAMAUTH_DOMAIN=http://localhost:8084 # change this to your domain
+export IAMAUTH_CALLBACK_PATH=callback # change this to your route. much match path
+export IAMAUTH_USER_TYPE=gcp # see drivers
+export IAMAUTH_USER_PROJECT=<YOUR_PROJECT> # GCP drivers supported for now
+```
+
 see example app in `app/`.
-fill out the iamauth.env file per the template `iamauth.env` and save it to the `app/` directory
 `go run example.go`
 
 

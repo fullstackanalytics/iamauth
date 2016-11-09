@@ -4,9 +4,10 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/gorilla/sessions"
-	dot "github.com/joho/godotenv"
+	//dot "github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
@@ -14,42 +15,41 @@ import (
 )
 
 var (
+
 	// the root domain URL with scheme
 	Domain string
-
 	// the callback Path for step2
 	CallbackPath string
-
 	// the type (Driver) of IAM to use. zero value ("") if not set. and the project
-	IAMType, Project string
+	Project, IAMType string
 
 	// cookie store with iamauth session
 	Store *sessions.CookieStore
-
+	// iam auth database in memory
 	UserDb *users.UserStore
-
 	// [private] the oauth config for connecting to google apps.
 	conf *oauth2.Config
 )
 
 func Load() {
-
-	// load the configuration file
-	var cfg map[string]string
-	cfg, err := dot.Read("iamauth.env")
-	if err != nil {
-		log.Fatal("unable to read iamauth.env")
-	}
+	var err error
 
 	// set public vars
-	Domain = cfg["domain"]
-	CallbackPath = cfg["path.callback"]
-	IAMType = cfg["iam.type"]
-	Project = cfg["iam.project"]
+	key := os.Getenv("GOOGLE_APP_KEY")
+	secret := os.Getenv("GOOGLE_APP_SECRET")
+	Domain = os.Getenv("IAMAUTH_DOMAIN")
+	CallbackPath = os.Getenv("IAMAUTH_CALLBACK_PATH")
+	IAMType = os.Getenv("IAMAUTH_USER_TYPE")
+	Project = os.Getenv("IAMAUTH_USER_PROJECT")
 
-	// extract secrets
-	key := cfg["key"]
-	secret := cfg["secret"]
+	if (key == "") ||
+		(secret == "") ||
+		(Domain == "") ||
+		(CallbackPath == "") ||
+		(IAMType == "") ||
+		(Project == "") {
+		log.Fatal("missing necessary env variables for IAM auth")
+	}
 
 	// create Cookie store register generic map for serialization
 	gob.Register(map[string]interface{}{})
