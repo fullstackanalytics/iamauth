@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"text/template"
@@ -72,7 +71,6 @@ func (d *GCPDriver) GetIamUsers() (users []*UserRecord, err error) {
 	if err != nil {
 		return
 	}
-	log.Println("user req: ", string(body))
 
 	var p policy
 	// unmarshal JSON response.
