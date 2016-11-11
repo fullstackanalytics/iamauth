@@ -31,13 +31,13 @@ var (
 
 // the response body for Google cloud resource manager
 type policy struct {
-	Version  int `json:version`
+	Version  int `json:"version"`
 	Bindings []binding
 }
 
 type binding struct {
-	Role    string   `json:role`
-	Members []member `json:members`
+	Role    string   `json:"role"`
+	Members []member `json:"members"`
 }
 
 type member string
