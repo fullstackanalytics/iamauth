@@ -13,7 +13,7 @@ func Protect(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if _, ok := session.Values["profile"]; !ok {
+		if _, ok := session.Values["access_token"]; !ok {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}

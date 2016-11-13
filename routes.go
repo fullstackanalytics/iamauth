@@ -78,6 +78,37 @@ func Step2(nextPath string, roles ...string) http.HandlerFunc {
 	}
 }
 
+func Disconnect(w http.ResponseWriter, r *http.Request) {
+
+	session, err := Store.Get(r, SessionToken)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	token := session.Values["access_token"]
+	if token == nil {
+		http.Error(w, "current user not connected", http.StatusInternalServerError)
+		return
+	}
+
+	url := "https://accounts.google.com/o/oauth2/revoke?token=" + token.(string)
+	resp, err := http.Get(url)
+	if err != nil {
+		http.Error(w, "failed to revoke token", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		http.Error(w, "failed to revoke token", http.StatusInternalServerError)
+		return
+	}
+
+	delete(session.Values, "access_token")
+	delete(session.Values, "authenticated")
+	session.Save(r, w)
+	return
+}
+
 func UserName(r *http.Request) (string, error) {
 	return extract("given_name", r)
 }
